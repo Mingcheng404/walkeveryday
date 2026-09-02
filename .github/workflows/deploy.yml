@@ -38,6 +38,16 @@ jobs:
         run: |
           test -n "$VITE_SUPABASE_URL" || (echo "Missing secret: VITE_SUPABASE_URL" && exit 1)
           test -n "$VITE_SUPABASE_ANON_KEY" || (echo "Missing secret: VITE_SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY" && exit 1)
+          if [[ "$VITE_SUPABASE_URL" =~ ^https?:// ]]; then
+            echo "Supabase URL format: full URL"
+          elif [[ "$VITE_SUPABASE_URL" =~ ^[a-zA-Z0-9-]+$ ]]; then
+            echo "Supabase URL format: project ref (frontend will normalize to https://<ref>.supabase.co)"
+          elif [[ "$VITE_SUPABASE_URL" =~ ^[a-zA-Z0-9-]+\.supabase\.co$ ]]; then
+            echo "Supabase URL format: domain without protocol (frontend will normalize)"
+          else
+            echo "VITE_SUPABASE_URL is not a supported format."
+            exit 1
+          fi
 
       - name: Build static site
         run: npm run build
@@ -63,4 +73,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
