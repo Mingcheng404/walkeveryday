@@ -38,16 +38,42 @@ jobs:
         run: |
           test -n "$VITE_SUPABASE_URL" || (echo "Missing secret: VITE_SUPABASE_URL" && exit 1)
           test -n "$VITE_SUPABASE_ANON_KEY" || (echo "Missing secret: VITE_SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY" && exit 1)
-          if [[ "$VITE_SUPABASE_URL" =~ ^https?:// ]]; then
-            echo "Supabase URL format: full URL"
-          elif [[ "$VITE_SUPABASE_URL" =~ ^[a-zA-Z0-9-]+$ ]]; then
-            echo "Supabase URL format: project ref (frontend will normalize to https://<ref>.supabase.co)"
-          elif [[ "$VITE_SUPABASE_URL" =~ ^[a-zA-Z0-9-]+\.supabase\.co$ ]]; then
-            echo "Supabase URL format: domain without protocol (frontend will normalize)"
+
+          RAW_URL="$(echo "$VITE_SUPABASE_URL" | tr -d '\r' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+          RAW_URL="${RAW_URL#VITE_SUPABASE_URL=}"
+          RAW_URL="${RAW_URL#\"}"
+          RAW_URL="${RAW_URL%\"}"
+          RAW_URL="${RAW_URL#\'}"
+          RAW_URL="${RAW_URL%\'}"
+
+          if [[ "$RAW_URL" =~ ^https?:// ]]; then
+            NORMALIZED_URL="$RAW_URL"
+          elif [[ "$RAW_URL" =~ ^[a-zA-Z0-9-]+$ ]]; then
+            NORMALIZED_URL="https://${RAW_URL}.supabase.co"
+          elif [[ "$RAW_URL" =~ ^[a-zA-Z0-9-]+\.supabase\.co$ ]]; then
+            NORMALIZED_URL="https://${RAW_URL}"
           else
             echo "VITE_SUPABASE_URL is not a supported format."
+            echo "Provided value: $VITE_SUPABASE_URL"
+            echo "Expected one of:"
+            echo "  - https://<project-ref>.supabase.co"
+            echo "  - <project-ref>.supabase.co"
+            echo "  - <project-ref>"
             exit 1
           fi
+
+          RAW_KEY="$(echo "$VITE_SUPABASE_ANON_KEY" | tr -d '\r' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+          RAW_KEY="${RAW_KEY#VITE_SUPABASE_ANON_KEY=}"
+          RAW_KEY="${RAW_KEY#VITE_SUPABASE_PUBLISHABLE_KEY=}"
+          RAW_KEY="${RAW_KEY#\"}"
+          RAW_KEY="${RAW_KEY%\"}"
+          RAW_KEY="${RAW_KEY#\'}"
+          RAW_KEY="${RAW_KEY%\'}"
+          test -n "$RAW_KEY" || (echo "Supabase publishable/anon key becomes empty after normalization." && exit 1)
+
+          echo "VITE_SUPABASE_URL=$NORMALIZED_URL" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_ANON_KEY=$RAW_KEY" >> "$GITHUB_ENV"
+          echo "Normalized Supabase URL for build: $NORMALIZED_URL"
 
       - name: Build static site
         run: npm run build
@@ -73,3 +99,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
