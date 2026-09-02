@@ -7,6 +7,7 @@ const rawSupabaseAnonKey =
 
 const normalizedSupabaseUrl = normalizeSupabaseUrl(rawSupabaseUrl)
 const normalizedSupabaseAnonKey = normalizeSupabaseKey(rawSupabaseAnonKey)
+
 const validSupabaseUrl = isValidHttpUrl(normalizedSupabaseUrl)
 const validSupabaseKey = normalizedSupabaseAnonKey.length > 0
 
@@ -24,39 +25,59 @@ export const supabase = createClient<Database>(
   },
 )
 
-function normalizeToken(value: string): string {
-  return value.trim().replace(/\r/g, '').replace(/^['"]|['"]$/g, '')
-}
-
 function normalizeSupabaseUrl(value: string): string {
-  const sanitized = normalizeToken(value).replace(/^(VITE_SUPABASE_URL|SUPABASE_URL)\s*=\s*/i, '')
-  if (!sanitized) {
+  const trimmed = cleanToken(value)
+  const withoutPrefix = stripEnvPrefix(trimmed, ['VITE_SUPABASE_URL', 'SUPABASE_URL'])
+
+  if (!withoutPrefix) {
     return ''
   }
 
-  if (isValidHttpUrl(sanitized)) {
-    return sanitized
+  if (isValidHttpUrl(withoutPrefix)) {
+    return withoutPrefix
   }
 
-  // Support common secret mistakes:
-  // 1) Project ref only: "abcd1234"
-  // 2) Domain without protocol: "abcd1234.supabase.co"
-  if (/^[a-z0-9-]+$/i.test(sanitized)) {
-    return `https://${sanitized}.supabase.co`
-  }
-  if (/^[a-z0-9-]+\.supabase\.co$/i.test(sanitized)) {
-    return `https://${sanitized}`
+  if (/^[a-z0-9-]+$/i.test(withoutPrefix)) {
+    return `https://${withoutPrefix}.supabase.co`
   }
 
-  return sanitized
+  if (/^[a-z0-9-]+\.supabase\.co$/i.test(withoutPrefix)) {
+    return `https://${withoutPrefix}`
+  }
+
+  return withoutPrefix
 }
 
 function normalizeSupabaseKey(value: string): string {
-  const sanitized = normalizeToken(value).replace(
-    /^(VITE_SUPABASE_ANON_KEY|VITE_SUPABASE_PUBLISHABLE_KEY|SUPABASE_ANON_KEY|SUPABASE_PUBLISHABLE_KEY)\s*=\s*/i,
-    '',
-  )
-  return normalizeToken(sanitized)
+  const trimmed = cleanToken(value)
+  const withoutPrefix = stripEnvPrefix(trimmed, [
+    'VITE_SUPABASE_ANON_KEY',
+    'VITE_SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_ANON_KEY',
+    'SUPABASE_PUBLISHABLE_KEY',
+  ])
+  return cleanToken(withoutPrefix)
+}
+
+function cleanToken(value: string): string {
+  let output = value.replace(/\r/g, '').trim()
+  if (output.startsWith('"') && output.endsWith('"')) {
+    output = output.slice(1, -1)
+  }
+  if (output.startsWith("'") && output.endsWith("'")) {
+    output = output.slice(1, -1)
+  }
+  return output.trim()
+}
+
+function stripEnvPrefix(value: string, keys: string[]): string {
+  for (const key of keys) {
+    const prefix = `${key}=`
+    if (value.toUpperCase().startsWith(prefix)) {
+      return value.slice(prefix.length).trim()
+    }
+  }
+  return value
 }
 
 function isValidHttpUrl(value: string): boolean {
@@ -67,5 +88,3 @@ function isValidHttpUrl(value: string): boolean {
     return false
   }
 }
-
-        uses: actions/deploy-pages@v4
