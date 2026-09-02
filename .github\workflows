@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY }}
       VITE_BASE_PATH: /${{ github.event.repository.name }}/
     steps:
       - name: Checkout
@@ -33,6 +33,11 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Validate required secrets
+        run: |
+          test -n "$VITE_SUPABASE_URL" || (echo "Missing secret: VITE_SUPABASE_URL" && exit 1)
+          test -n "$VITE_SUPABASE_ANON_KEY" || (echo "Missing secret: VITE_SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY" && exit 1)
 
       - name: Build static site
         run: npm run build
