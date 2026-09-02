@@ -1,61 +1,101 @@
-import { createClient } from '@supabase/supabase-js'
-import type { Database } from './database.types'
+name: Deploy WalkEveryDay
 
-const rawSupabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? ''
-const rawSupabaseAnonKey =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? ''
+on:
+  push:
+    branches: ['main']
+  workflow_dispatch:
 
-const normalizedSupabaseUrl = normalizeSupabaseUrl(rawSupabaseUrl)
-const normalizedSupabaseAnonKey = normalizeToken(rawSupabaseAnonKey)
-const validSupabaseUrl = isValidHttpUrl(normalizedSupabaseUrl)
-const validSupabaseKey = normalizedSupabaseAnonKey.length > 0
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
-export const isSupabaseConfigured = validSupabaseUrl && validSupabaseKey
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
-export const supabase = createClient<Database>(
-  validSupabaseUrl ? normalizedSupabaseUrl : 'https://placeholder.supabase.co',
-  validSupabaseKey ? normalizedSupabaseAnonKey : 'placeholder-anon-key',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  },
-)
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || secrets.VITE_SUPABASE_ANON_KEY }}
+      VITE_BASE_PATH: /${{ github.event.repository.name }}/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-function normalizeToken(value: string): string {
-  return value.trim().replace(/^['"]|['"]$/g, '')
-}
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
 
-function normalizeSupabaseUrl(value: string): string {
-  const sanitized = normalizeToken(value)
-  if (!sanitized) {
-    return ''
-  }
+      - name: Install dependencies
+        run: npm ci
 
-  if (isValidHttpUrl(sanitized)) {
-    return sanitized
-  }
+      - name: Validate required secrets
+        run: |
+          test -n "$VITE_SUPABASE_URL" || (echo "Missing secret: VITE_SUPABASE_URL" && exit 1)
+          test -n "$VITE_SUPABASE_ANON_KEY" || (echo "Missing secret: VITE_SUPABASE_PUBLISHABLE_KEY or VITE_SUPABASE_ANON_KEY" && exit 1)
 
-  // Support common secret mistakes:
-  // 1) Project ref only: "abcd1234"
-  // 2) Domain without protocol: "abcd1234.supabase.co"
-  if (/^[a-z0-9-]+$/i.test(sanitized)) {
-    return `https://${sanitized}.supabase.co`
-  }
-  if (/^[a-z0-9-]+\.supabase\.co$/i.test(sanitized)) {
-    return `https://${sanitized}`
-  }
+          RAW_URL="$(echo "$VITE_SUPABASE_URL" | tr -d '\r' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+          RAW_URL="${RAW_URL#VITE_SUPABASE_URL=}"
+          RAW_URL="${RAW_URL#\"}"
+          RAW_URL="${RAW_URL%\"}"
+          RAW_URL="${RAW_URL#\'}"
+          RAW_URL="${RAW_URL%\'}"
 
-  return sanitized
-}
+          if [[ "$RAW_URL" =~ ^https?:// ]]; then
+            NORMALIZED_URL="$RAW_URL"
+          elif [[ "$RAW_URL" =~ ^[a-zA-Z0-9-]+$ ]]; then
+            NORMALIZED_URL="https://${RAW_URL}.supabase.co"
+          elif [[ "$RAW_URL" =~ ^[a-zA-Z0-9-]+\.supabase\.co$ ]]; then
+            NORMALIZED_URL="https://${RAW_URL}"
+          else
+            echo "VITE_SUPABASE_URL is not a supported format."
+            echo "Provided value: $VITE_SUPABASE_URL"
+            echo "Expected one of:"
+            echo "  - https://<project-ref>.supabase.co"
+            echo "  - <project-ref>.supabase.co"
+            echo "  - <project-ref>"
+            exit 1
+          fi
 
-function isValidHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    return url.protocol === 'http:' || url.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
+          RAW_KEY="$(echo "$VITE_SUPABASE_ANON_KEY" | tr -d '\r' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+          RAW_KEY="${RAW_KEY#VITE_SUPABASE_ANON_KEY=}"
+          RAW_KEY="${RAW_KEY#VITE_SUPABASE_PUBLISHABLE_KEY=}"
+          RAW_KEY="${RAW_KEY#\"}"
+          RAW_KEY="${RAW_KEY%\"}"
+          RAW_KEY="${RAW_KEY#\'}"
+          RAW_KEY="${RAW_KEY%\'}"
+          test -n "$RAW_KEY" || (echo "Supabase publishable/anon key becomes empty after normalization." && exit 1)
+
+          echo "VITE_SUPABASE_URL=$NORMALIZED_URL" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_ANON_KEY=$RAW_KEY" >> "$GITHUB_ENV"
+          echo "Normalized Supabase URL for build: $NORMALIZED_URL"
+
+      - name: Build static site
+        run: npm run build
+
+      - name: Add SPA fallback for GitHub Pages
+        run: cp dist/index.html dist/404.html
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
