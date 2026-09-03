@@ -86,9 +86,33 @@ export function createHandlers(s: S): Handlers {
     if (!isSupabaseConfigured) { s.setStatusMessage('請先設定 Supabase 環境變數。'); return }
     const mins = Number.parseInt(s.estimatedTimeMins, 10)
     if (!Number.isFinite(mins) || mins < 10 || mins > 180) { s.setStatusMessage('請輸入 10 至 180 分鐘之間的步行時間。'); return }
-    s.setIsGenerating(true); s.setStatusMessage('正在生成隨機路線與打卡點...')
+    s.setIsGenerating(true); s.setStatusMessage('正在取得你的 GPS 位置...')
+
+    // Step 1: Get user's GPS location
+    let userLocation: LatLng | null = null
+    if ('geolocation' in navigator) {
+      try {
+        userLocation = await new Promise<LatLng>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => resolve([pos.coords.latitude, pos.coords.longitude]),
+            (e) => reject(e),
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+          )
+        })
+        s.setCurrentPosition(userLocation)
+      } catch {
+        // GPS failed - continue without user location (random start)
+      }
+    }
+
+    s.setStatusMessage(userLocation ? '正在從你的位置生成路線...' : '無法取得定位，正在生成隨機路線...')
     try {
-      const gen = await generateRandomRoute({ regionId: s.selectedRegionId, estimatedTimeMins: mins, boundaries: s.boundaries })
+      const gen = await generateRandomRoute({
+        regionId: s.selectedRegionId,
+        estimatedTimeMins: mins,
+        boundaries: s.boundaries,
+        userLocation,
+      })
       // Build a temporary route record for display (works without login)
       const tempRoute: RouteRecord = {
         id: `temp_${Date.now()}`,

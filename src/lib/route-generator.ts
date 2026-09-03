@@ -42,6 +42,7 @@ export async function generateRandomRoute(params: {
   regionId: ActiveRegionId
   estimatedTimeMins: number
   boundaries: DistrictFeatureCollection | null
+  userLocation?: LatLng | null
 }): Promise<GeneratedRoute> {
   const targetDistanceKm = Math.max(0.8, (params.estimatedTimeMins / 60) * AVERAGE_WALKING_SPEED_KMH)
 
@@ -57,13 +58,27 @@ export async function generateRandomRoute(params: {
   const useBboxFallback = !polygons || polygons.length === 0
   const bbox = REGION_BBOX[params.regionId]
 
+  // Convert user location to LngLat if provided
+  const userLngLat: LngLat | null = params.userLocation
+    ? [params.userLocation[1], params.userLocation[0]]
+    : null
+
+  // Check if user location is within the region (polygons or bbox)
+  const userInRegion = userLngLat ? isPointInRegion(userLngLat, polygons, bbox) : false
+
   let bestPath: LatLng[] = []
   let bestDistanceGap = Number.POSITIVE_INFINITY
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const loopWaypoints = useBboxFallback
-      ? buildLoopWaypointsBbox(bbox, targetDistanceKm, params.estimatedTimeMins)
-      : buildLoopWaypoints(polygons!, targetDistanceKm, params.estimatedTimeMins)
+    let loopWaypoints: LngLat[]
+    if (userInRegion && userLngLat) {
+      // Start from user's GPS location
+      loopWaypoints = buildWaypointsFromStart(userLngLat, polygons, targetDistanceKm, params.estimatedTimeMins, (p) => isPointInRegion(p, polygons, bbox))
+    } else if (useBboxFallback) {
+      loopWaypoints = buildLoopWaypointsBbox(bbox, targetDistanceKm, params.estimatedTimeMins)
+    } else {
+      loopWaypoints = buildLoopWaypoints(polygons!, targetDistanceKm, params.estimatedTimeMins)
+    }
     const path = await getRoutePath(loopWaypoints)
     const distanceKm = polylineDistanceKm(path)
     const gap = Math.abs(distanceKm - targetDistanceKm)
@@ -97,6 +112,13 @@ export async function generateRandomRoute(params: {
     pathCoordinates: normalizedPath,
     checkpoints: buildCheckpoints(normalizedPath, params.estimatedTimeMins),
   }
+}
+
+function isPointInRegion(point: LngLat, polygons: LngLat[][][] | null, bbox: { minLng: number; maxLng: number; minLat: number; maxLat: number }): boolean {
+  if (polygons && polygons.length > 0) {
+    return pointInMultiPolygon(point, polygons)
+  }
+  return point[0] >= bbox.minLng && point[0] <= bbox.maxLng && point[1] >= bbox.minLat && point[1] <= bbox.maxLat
 }
 
 function buildLoopWaypoints(polygons: LngLat[][][], targetDistanceKm: number, minutes: number): LngLat[] {
