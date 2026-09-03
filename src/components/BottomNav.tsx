@@ -17,8 +17,8 @@ export default function BottomNav({ activeTab, onChange }: BottomNavProps) {
   return (
     <nav className="pointer-events-auto fixed inset-x-0 bottom-0 z-[990] border-t border-slate-700 bg-slate-900/95 backdrop-blur">
       <div
-        className="mx-auto flex w-full max-w-xl items-center justify-between px-1 pt-2"
-        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+        className="mx-auto flex w-full max-w-xl items-center justify-between px-1 pt-1.5"
+        style={{ paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}
       >
         {tabs.map((tab) => {
           const active = activeTab === tab.id
@@ -27,7 +27,7 @@ export default function BottomNav({ activeTab, onChange }: BottomNavProps) {
               key={tab.id}
               type="button"
               onClick={() => onChange(tab.id)}
-              className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium ${
+              className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-medium ${
                 active ? 'bg-blue-500/20 text-blue-200' : 'text-slate-300'
               }`}
             >

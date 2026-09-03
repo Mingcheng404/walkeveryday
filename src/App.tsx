@@ -81,18 +81,18 @@ function AppView({ s, h }: { s: ReturnType<typeof useAppLogic>; h: Handlers }) {
 
 function Header({ s, h }: { s: ReturnType<typeof useAppLogic>; h: Handlers }) {
   return (
-    <header className="pointer-events-none absolute left-0 right-0 top-0 z-[900] p-3">
-      <div className="pointer-events-auto mx-auto flex max-w-xl items-center justify-between rounded-2xl border border-slate-700/80 bg-slate-900/90 px-4 py-3 shadow-xl backdrop-blur">
-        <div>
-          <p className="m-0 text-base font-bold text-slate-100">WalkEveryDay</p>
-          <p className="m-0 text-xs text-slate-300">{s.isOnline ? '🟢 Online' : '🟠 Offline'} · 香港散步探索 PWA</p>
+    <header className="pointer-events-none absolute left-0 right-0 top-0 z-[900] px-2 pt-2">
+      <div className="pointer-events-auto mx-auto flex max-w-xl items-center justify-between rounded-xl border border-slate-700/80 bg-slate-900/90 px-3 py-2 shadow-lg backdrop-blur">
+        <div className="min-w-0">
+          <p className="m-0 truncate text-sm font-bold text-slate-100">WalkEveryDay</p>
+          <p className="m-0 text-[10px] text-slate-300">{s.isOnline ? '🟢' : '🟠'} 香港散步 PWA</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           {s.installPromptEvent && (
-            <button type="button" onClick={() => void h.handleInstallPwa()} className="rounded-lg border border-emerald-400/70 px-3 py-2 text-xs font-semibold text-emerald-200">安裝 App</button>
+            <button type="button" onClick={() => void h.handleInstallPwa()} className="rounded-lg border border-emerald-400/70 px-2 py-1.5 text-[11px] font-semibold text-emerald-200">安裝</button>
           )}
           {!s.session && (
-            <button type="button" onClick={() => h.requestAuth('登入後可儲存路線、統計與成就')} className="rounded-lg bg-blue-500 px-3 py-2 text-xs font-semibold text-white">登入</button>
+            <button type="button" onClick={() => h.requestAuth('登入後可儲存路線、統計與成就')} className="rounded-lg bg-blue-500 px-2.5 py-1.5 text-[11px] font-semibold text-white">登入</button>
           )}
         </div>
       </div>
@@ -102,9 +102,9 @@ function Header({ s, h }: { s: ReturnType<typeof useAppLogic>; h: Handlers }) {
 
 function BottomSheetArea({ s, h }: { s: ReturnType<typeof useAppLogic>; h: Handlers }) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-[76px] z-[900] p-3">
-      <div className="pointer-events-auto">
-        <BottomSheet>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[900] pb-[76px]">
+        <div className="pointer-events-auto px-2 pb-1">
+          <BottomSheet>
           {s.activeTab === 'explore' && <ExploreTab s={s} h={h} />}
           {s.activeTab === 'record' && (
             <RecordPanel
@@ -161,46 +161,46 @@ function BottomSheetArea({ s, h }: { s: ReturnType<typeof useAppLogic>; h: Handl
 
 function ExploreTab({ s, h }: { s: ReturnType<typeof useAppLogic>; h: Handlers }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {!isSupabaseConfigured && (
-        <p className="m-0 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">尚未設定 Supabase 金鑰，請先建立 `.env`。</p>
+        <p className="m-0 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-200">尚未設定 Supabase 金鑰，請先建立 `.env`。</p>
       )}
       {s.boundariesError && (
-        <p className="m-0 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">{s.boundariesError}（路線生成仍可用備援邊界）</p>
+        <p className="m-0 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-200">{s.boundariesError}（路線生成仍可用備援邊界）</p>
       )}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="space-y-1">
-          <span className="text-xs text-slate-300">開放區域</span>
-          <select value={s.selectedRegionId} onChange={(e) => s.setSelectedRegionId(e.target.value as ActiveRegionId)} className="w-full rounded-xl border border-slate-600 bg-slate-800 px-3 py-3 text-base text-slate-100">
+      <div className="grid grid-cols-2 gap-2">
+        <label className="space-y-0.5">
+          <span className="text-[11px] text-slate-300">區域</span>
+          <select value={s.selectedRegionId} onChange={(e) => s.setSelectedRegionId(e.target.value as ActiveRegionId)} className="w-full rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-2 text-sm text-slate-100">
             {ACTIVE_REGIONS.map((r) => (<option key={r.id} value={r.id}>{r.label}</option>))}
           </select>
         </label>
-        <label className="space-y-1">
-          <span className="text-xs text-slate-300">預計行走時間 (分鐘)</span>
-          <input type="number" inputMode="numeric" min={10} max={180} step={5} value={s.estimatedTimeMins} onChange={(e) => s.setEstimatedTimeMins(e.target.value)} className="w-full rounded-xl border border-slate-600 bg-slate-800 px-3 py-3 text-base text-slate-100" />
+        <label className="space-y-0.5">
+          <span className="text-[11px] text-slate-300">時間 (分鐘)</span>
+          <input type="number" inputMode="numeric" min={10} max={180} step={5} value={s.estimatedTimeMins} onChange={(e) => s.setEstimatedTimeMins(e.target.value)} className="w-full rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-2 text-sm text-slate-100" />
         </label>
       </div>
-      <button type="button" onClick={() => void h.handleGenerateRoute()} disabled={s.isGenerating} className="w-full rounded-2xl bg-blue-500 px-4 py-3 text-base font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
-        {s.isGenerating ? '生成中...' : '生成隨機散步路線'}
+      <button type="button" onClick={() => void h.handleGenerateRoute()} disabled={s.isGenerating} className="w-full rounded-xl bg-blue-500 px-3 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">
+        {s.isGenerating ? '生成中...' : '🎲 生成隨機散步路線'}
       </button>
       {s.currentRoute && (
-        <div className="rounded-2xl border border-slate-700 bg-slate-800/70 p-3">
-          <p className="m-0 text-sm font-semibold text-slate-100">目前路線：{s.currentRouteName}</p>
-          <p className="m-0 mt-1 text-sm text-slate-300">預估 {s.currentRoute.estimatedTimeMins} 分鐘 · 約 {s.currentRoute.totalDistanceKm.toFixed(2)} km</p>
-          <p className="m-0 mt-1 text-xs text-amber-200">打卡進度：{s.currentRouteUnlockedCheckpointCount}/{s.currentRoute.checkpoints.length}</p>
-          <p className="m-0 mt-1 text-xs text-slate-300">路線完成度：{s.progressPercentage}%</p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => void h.handleStartTracking()} disabled={s.isTracking} className="rounded-xl bg-emerald-500 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">開始 GPS 追蹤</button>
-            <button type="button" onClick={() => void h.stopTracking('paused')} disabled={!s.isTracking} className="rounded-xl border border-slate-500 px-3 py-2 text-sm font-semibold text-slate-100 disabled:cursor-not-allowed disabled:opacity-40">暫停追蹤</button>
+        <div className="rounded-xl border border-slate-700 bg-slate-800/70 p-2.5">
+          <div className="flex items-center justify-between">
+            <p className="m-0 text-xs font-semibold text-slate-100">{s.currentRouteName}</p>
+            <p className="m-0 text-[11px] text-slate-300">{s.currentRoute.estimatedTimeMins}分 · {s.currentRoute.totalDistanceKm.toFixed(2)}km</p>
+          </div>
+          <div className="mt-1 flex items-center gap-2 text-[11px]">
+            <span className="text-amber-200">📍 {s.currentRouteUnlockedCheckpointCount}/{s.currentRoute.checkpoints.length}</span>
+            <span className="text-slate-300">完成 {s.progressPercentage}%</span>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <button type="button" onClick={() => void h.handleStartTracking()} disabled={s.isTracking} className="rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">▶ 開始 GPS</button>
+            <button type="button" onClick={() => void h.stopTracking('paused')} disabled={!s.isTracking} className="rounded-lg border border-slate-500 px-2.5 py-1.5 text-xs font-semibold text-slate-100 disabled:cursor-not-allowed disabled:opacity-40">⏸ 暫停</button>
           </div>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-2 text-xs text-slate-300">
-        <div className="rounded-lg bg-slate-800 px-2 py-1"><span className="inline-block h-2 w-5 rounded bg-blue-500" /> 未行走路段</div>
-        <div className="rounded-lg bg-slate-800 px-2 py-1"><span className="inline-block h-2 w-5 rounded bg-slate-500" /> 已行走路段</div>
-      </div>
-      {s.locationError && (<p className="m-0 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">定位錯誤：{s.locationError}</p>)}
-      <p className="m-0 rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-2 text-sm text-slate-200">{s.statusMessage}</p>
+      {s.locationError && (<p className="m-0 rounded-lg border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-xs text-rose-200">⚠ {s.locationError}</p>)}
+      <p className="m-0 rounded-lg border border-slate-700 bg-slate-800/70 px-2.5 py-1.5 text-xs text-slate-200">{s.statusMessage}</p>
     </div>
   )
 }
