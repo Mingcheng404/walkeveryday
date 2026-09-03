@@ -15,23 +15,22 @@ export default function AuthModal({ isOpen, title, onClose, onSuccess }: AuthMod
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
+  const [otp, setOtp] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [noticeMessage, setNoticeMessage] = useState('')
 
-  const modalTitle = useMemo(() => {
-    if (title) {
-      return title
-    }
-    return mode === 'signin' ? '登入 WalkEveryDay' : '建立帳戶'
-  }, [mode, title])
+  const modalTitle = useMemo(() => title ?? (mode === 'signin' ? '登入 WalkEveryDay' : '建立帳戶'), [mode, title])
 
-  if (!isOpen) {
-    return null
-  }
+  if (!isOpen) return null
 
   const submitDisabled =
-    isSubmitting || !email.trim() || !password.trim() || (mode === 'signup' && !username.trim())
+    isSubmitting ||
+    !email.trim() ||
+    (mode === 'signin' && !password.trim()) ||
+    (mode === 'signup' && !otpSent && !email.trim()) ||
+    (mode === 'signup' && otpSent && (!otp.trim() || !password.trim() || !username.trim()))
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
@@ -46,36 +45,40 @@ export default function AuthModal({ isOpen, title, onClose, onSuccess }: AuthMod
     setIsSubmitting(true)
     try {
       if (mode === 'signin') {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        })
-        if (error) {
-          throw error
-        }
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+        if (error) throw error
         onSuccess()
         onClose()
-      } else {
-        const { data, error } = await supabase.auth.signUp({
+      } else if (!otpSent) {
+        // Step 1: send OTP confirmation email
+        const { error } = await supabase.auth.signInWithOtp({
           email: email.trim(),
-          password,
-          options: {
-            data: {
-              username: username.trim(),
-            },
-          },
+          options: { shouldCreateUser: false },
         })
-        if (error) {
-          throw error
+        if (error) throw error
+        setOtpSent(true)
+        setNoticeMessage('已寄送驗證碼到你的 Email，請輸入收到的 6 位數驗證碼、密碼與名稱完成註冊。')
+      } else {
+        // Step 2: verify OTP then set password + username
+        const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+          email: email.trim(),
+          token: otp.trim(),
+          type: 'signup',
+        })
+        if (verifyError) throw verifyError
+
+        // Set password and username metadata
+        if (verifyData.user) {
+          const { error: updateError } = await supabase.auth.updateUser({
+            password,
+            data: { username: username.trim() },
+          })
+          if (updateError) throw updateError
         }
 
-        if (data.session) {
-          onSuccess()
-          onClose()
-        } else {
-          setNoticeMessage('註冊成功，請檢查信箱驗證信，完成後再登入。')
-          setMode('signin')
-        }
+        setNoticeMessage('帳號建立成功！')
+        onSuccess()
+        onClose()
       }
     } catch (error) {
       const message = resolveErrorMessage(error, mode)
@@ -100,47 +103,73 @@ export default function AuthModal({ isOpen, title, onClose, onSuccess }: AuthMod
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {mode === 'signup' && (
-            <label className="block space-y-2">
-              <span className="text-sm text-slate-200">用戶名稱</span>
-              <input
-                type="text"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                className="w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-base text-slate-100 outline-none focus:border-blue-400"
-                placeholder="例如：walker_hk"
-              />
-            </label>
-          )}
-
           <label className="block space-y-2">
             <span className="text-sm text-slate-200">Email</span>
             <input
               type="email"
               value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-base text-slate-100 outline-none focus:border-blue-400"
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={otpSent}
+              className="w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-base text-slate-100 outline-none focus:border-blue-400 disabled:opacity-60"
               placeholder="you@example.com"
             />
           </label>
 
-          <label className="block space-y-2">
-            <span className="text-sm text-slate-200">密碼</span>
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-base text-slate-100 outline-none focus:border-blue-400"
-              placeholder="至少 8 碼"
-            />
-          </label>
+          {mode === 'signup' && otpSent && (
+            <>
+              <label className="block space-y-2">
+                <span className="text-sm text-slate-200">Email 驗證碼</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  className="w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-base tracking-widest text-slate-100 outline-none focus:border-blue-400"
+                  placeholder="123456"
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-sm text-slate-200">用戶名稱</span>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-base text-slate-100 outline-none focus:border-blue-400"
+                  placeholder="例如：walker_hk"
+                />
+              </label>
+              <label className="block space-y-2">
+                <span className="text-sm text-slate-200">設定密碼</span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-base text-slate-100 outline-none focus:border-blue-400"
+                  placeholder="至少 6 碼"
+                />
+              </label>
+            </>
+          )}
+
+          {mode === 'signin' && (
+            <label className="block space-y-2">
+              <span className="text-sm text-slate-200">密碼</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-base text-slate-100 outline-none focus:border-blue-400"
+                placeholder="至少 6 碼"
+              />
+            </label>
+          )}
 
           {errorMessage && (
             <p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
               {errorMessage}
             </p>
           )}
-
           {noticeMessage && (
             <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
               {noticeMessage}
@@ -152,7 +181,13 @@ export default function AuthModal({ isOpen, title, onClose, onSuccess }: AuthMod
             disabled={submitDisabled}
             className="w-full rounded-xl bg-blue-500 px-4 py-3 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {isSubmitting ? '處理中...' : mode === 'signin' ? '登入' : '註冊'}
+            {isSubmitting
+              ? '處理中...'
+              : mode === 'signup' && !otpSent
+                ? '寄送驗證碼'
+                : mode === 'signup' && otpSent
+                  ? '完成註冊'
+                  : '登入'}
           </button>
         </form>
 
@@ -164,6 +199,8 @@ export default function AuthModal({ isOpen, title, onClose, onSuccess }: AuthMod
               setMode(mode === 'signin' ? 'signup' : 'signin')
               setErrorMessage('')
               setNoticeMessage('')
+              setOtpSent(false)
+              setOtp('')
             }}
             className="ml-2 text-blue-300 underline underline-offset-2"
           >
@@ -176,44 +213,23 @@ export default function AuthModal({ isOpen, title, onClose, onSuccess }: AuthMod
 }
 
 function resolveErrorMessage(error: unknown, mode: AuthMode): string {
-  if (error instanceof Error && error.message) {
-    return normalizeAuthMessage(error.message, mode)
-  }
-
+  if (error instanceof Error && error.message) return normalizeAuthMessage(error.message, mode)
   if (typeof error === 'object' && error !== null && 'message' in error) {
     const message = (error as { message?: unknown }).message
-    if (typeof message === 'string' && message.trim()) {
-      return normalizeAuthMessage(message, mode)
-    }
+    if (typeof message === 'string' && message.trim()) return normalizeAuthMessage(message, mode)
   }
-
   return mode === 'signup' ? '註冊失敗，請稍後再試。' : '登入失敗，請稍後再試。'
 }
 
 function normalizeAuthMessage(rawMessage: string, mode: AuthMode): string {
-  const message = rawMessage.toLowerCase()
-
-  if (message.includes('email not confirmed')) {
-    return '此帳號尚未驗證 Email，請先到信箱點擊驗證連結。'
-  }
-  if (message.includes('invalid login credentials')) {
-    return '帳號或密碼錯誤，請重新輸入。'
-  }
-  if (message.includes('password should be at least')) {
-    return '密碼長度不足，請使用至少 6 碼。'
-  }
-  if (message.includes('user already registered')) {
-    return '此 Email 已註冊，可直接登入或重設密碼。'
-  }
-  if (message.includes('rate limit') || message.includes('over_email_send_rate_limit')) {
-    return '驗證信寄送太頻繁，請稍後再試，或先使用已註冊帳號登入。'
-  }
-  if (message.includes('email_address_invalid') || message.includes('email address') && message.includes('invalid')) {
-    return 'Email 格式無效，請改用可接收郵件的真實地址（例如 Gmail / Outlook）。'
-  }
-  if (message.includes('row-level security') || message.includes('permission denied')) {
-    return '資料庫權限設定尚未完成，請先執行最新的 Supabase schema.sql。'
-  }
-
+  const m = rawMessage.toLowerCase()
+  if (m.includes('email not confirmed')) return '此帳號尚未驗證 Email，請先到信箱點擊驗證連結。'
+  if (m.includes('invalid login credentials')) return '帳號或密碼錯誤，請重新輸入。'
+  if (m.includes('password should be at least')) return '密碼長度不足，請使用至少 6 碼。'
+  if (m.includes('user already registered')) return '此 Email 已註冊，可直接登入或重設密碼。'
+  if (m.includes('rate limit') || m.includes('over_email_send_rate_limit')) return '驗證信寄送太頻繁，請稍後再試。'
+  if (m.includes('email_address_invalid')) return 'Email 格式無效，請改用可接收郵件的真實地址。'
+  if (m.includes('token') && m.includes('invalid')) return '驗證碼無效或已過期，請重新寄送。'
+  if (m.includes('row-level security') || m.includes('permission denied')) return '資料庫權限設定尚未完成，請先執行 schema.sql。'
   return rawMessage || (mode === 'signup' ? '註冊失敗，請稍後再試。' : '登入失敗，請稍後再試。')
 }
