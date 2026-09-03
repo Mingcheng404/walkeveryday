@@ -38,6 +38,7 @@ export function useAppLogic() {
   const [isTracking, setIsTracking] = useState(false)
   const [walkedUntilIndex, setWalkedUntilIndex] = useState(0)
   const [currentPosition, setCurrentPosition] = useState<LatLng | null>(null)
+  const [userHeading, setUserHeading] = useState<number | null>(null)
   const [isOnline, setIsOnline] = useState(() => navigator.onLine)
   const [installPromptEvent, setInstallPromptEvent] = useState<BeforeInstallPromptEvent | null>(null)
   const [isRecording, setIsRecording] = useState(false)
@@ -82,7 +83,7 @@ export function useAppLogic() {
     currentRoute, setCurrentRoute, shareRoute, setShareRoute,
     statusMessage, setStatusMessage, locationError, setLocationError,
     isTracking, setIsTracking, walkedUntilIndex, setWalkedUntilIndex,
-    currentPosition, setCurrentPosition, isOnline, setIsOnline,
+    currentPosition, setCurrentPosition, userHeading, setUserHeading, isOnline, setIsOnline,
     installPromptEvent, setInstallPromptEvent,
     isRecording, setIsRecording, recordingTrack, setRecordingTrack,
     recordingDistanceKm, setRecordingDistanceKm, recordingDurationSec, setRecordingDurationSec,

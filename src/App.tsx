@@ -53,6 +53,7 @@ function AppView({ s, h }: { s: ReturnType<typeof useAppLogic>; h: Handlers }) {
         routePath={s.currentRoute?.pathCoordinates ?? []}
         walkedUntilIndex={s.walkedUntilIndex}
         currentPosition={s.currentPosition}
+        userHeading={s.userHeading}
         checkpoints={s.currentRoute?.checkpoints ?? []}
         recordingTrack={s.recordingTrack}
         isRecording={s.isRecording}

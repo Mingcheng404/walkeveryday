@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { CircleMarker, GeoJSON, MapContainer, Polyline, TileLayer, Tooltip } from 'react-leaflet'
+import { CircleMarker, GeoJSON, MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import L from 'leaflet'
 import type { StyleFunction } from 'leaflet'
 import {
   DISTRICT_NAME_ZH,
@@ -18,6 +19,7 @@ type MapViewProps = {
   routePath: LatLng[]
   walkedUntilIndex: number
   currentPosition: LatLng | null
+  userHeading: number | null
   checkpoints: RouteCheckpoint[]
   recordingTrack: LatLng[]
   isRecording: boolean
@@ -32,6 +34,47 @@ const districtStyle: StyleFunction = (feature) => {
   return { color: '#4B5563', weight: 1, fillColor: '#111827', fillOpacity: 0.55 }
 }
 
+// Calculate bearing between two points (degrees from north)
+function bearing(from: LatLng, to: LatLng): number {
+  const dLng = ((to[1] - from[1]) * Math.PI) / 180
+  const lat1 = (from[0] * Math.PI) / 180
+  const lat2 = (to[0] * Math.PI) / 180
+  const y = Math.sin(dLng) * Math.cos(lat2)
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng)
+  return (((Math.atan2(y, x) * 180) / Math.PI) + 360) % 360
+}
+
+// Create a directional arrow icon for route segments
+function createDirectionArrow(heading: number, color: string): L.DivIcon {
+  return L.divIcon({
+    className: 'route-direction-arrow',
+    html: `<div style="transform: rotate(${heading}deg); color: ${color}; font-size: 18px; font-weight: bold; text-shadow: 0 0 3px #000, 0 0 3px #000;">➤</div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  })
+}
+
+// Create a heading arrow icon for user's current position
+function createHeadingArrow(heading: number): L.DivIcon {
+  return L.divIcon({
+    className: 'user-heading-arrow',
+    html: `<div style="transform: rotate(${heading}deg); font-size: 28px; line-height: 1; filter: drop-shadow(0 0 4px rgba(34,197,94,0.8));">⬆️</div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+  })
+}
+
+// Component to recenter map on current position
+function Recenter({ position }: { position: LatLng | null }) {
+  const map = useMap()
+  useMemo(() => {
+    if (position) {
+      map.setView(position, Math.max(map.getZoom(), 15), { animate: true })
+    }
+  }, [position?.[0], position?.[1]])
+  return null
+}
+
 export default function MapView({
   boundaries,
   selectedRegionId,
@@ -39,6 +82,7 @@ export default function MapView({
   routePath,
   walkedUntilIndex,
   currentPosition,
+  userHeading,
   checkpoints,
   recordingTrack,
   isRecording,
@@ -55,6 +99,19 @@ export default function MapView({
 
   const startPoint = routePath[0] ?? null
   const endPoint = routePath.length > 1 ? routePath[routePath.length - 1] : null
+
+  // Generate direction arrows along the remaining (blue) path
+  const routeArrows = useMemo(() => {
+    if (remainingPath.length < 3) return [] as Array<{ pos: LatLng; heading: number }>
+    const arrows: Array<{ pos: LatLng; heading: number }> = []
+    const interval = Math.max(3, Math.floor(remainingPath.length / 6))
+    for (let i = 0; i < remainingPath.length - 1; i += interval) {
+      const from = remainingPath[i]
+      const to = remainingPath[Math.min(i + 1, remainingPath.length - 1)]
+      arrows.push({ pos: from, heading: bearing(from, to) })
+    }
+    return arrows
+  }, [remainingPath])
 
   const tinShuiWaiGeoJson = useMemo(
     () => ({
@@ -79,6 +136,8 @@ export default function MapView({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+
+        <Recenter position={currentPosition} />
 
         {boundaries && (
           <GeoJSON
@@ -119,14 +178,26 @@ export default function MapView({
           }}
         />
 
+        {/* Remaining path (blue) */}
         {remainingPath.length > 1 && (
           <Polyline positions={remainingPath} pathOptions={{ color: '#3B82F6', weight: 5 }} />
         )}
+        {/* Walked path (gray) */}
         {walkedPath.length > 1 && (
           <Polyline positions={walkedPath} pathOptions={{ color: '#6B7280', weight: 6 }} />
         )}
 
-        {/* Live recording track (user-created route) */}
+        {/* Direction arrows on remaining path (showing which way to walk) */}
+        {routeArrows.map((arrow, i) => (
+          <Marker
+            key={`arrow_${i}`}
+            position={arrow.pos}
+            icon={createDirectionArrow(arrow.heading, '#3B82F6')}
+            interactive={false}
+          />
+        ))}
+
+        {/* Live recording track */}
         {isRecording && recordingTrack.length > 1 && (
           <Polyline positions={recordingTrack} pathOptions={{ color: '#F59E0B', weight: 5, dashArray: '6 4' }} />
         )}
@@ -159,7 +230,15 @@ export default function MapView({
           </CircleMarker>
         ))}
 
-        {currentPosition && (
+        {/* User position with heading arrow */}
+        {currentPosition && userHeading !== null && (
+          <Marker
+            position={currentPosition}
+            icon={createHeadingArrow(userHeading)}
+            interactive={false}
+          />
+        )}
+        {currentPosition && userHeading === null && (
           <CircleMarker center={currentPosition} radius={8} pathOptions={{ color: '#22C55E', fillOpacity: 0.95 }}>
             <Tooltip direction="top" offset={[0, -8]} opacity={1}>目前位置</Tooltip>
           </CircleMarker>

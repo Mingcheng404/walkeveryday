@@ -94,7 +94,12 @@ export function createHandlers(s: S): Handlers {
       try {
         userLocation = await new Promise<LatLng>((resolve, reject) => {
           navigator.geolocation.getCurrentPosition(
-            (pos) => resolve([pos.coords.latitude, pos.coords.longitude]),
+            (pos) => {
+              resolve([pos.coords.latitude, pos.coords.longitude])
+              if (pos.coords.heading !== null && !Number.isNaN(pos.coords.heading)) {
+                s.setUserHeading(pos.coords.heading)
+              }
+            },
             (e) => reject(e),
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
           )
@@ -198,6 +203,9 @@ export function createHandlers(s: S): Handlers {
       (pos) => {
         const np: LatLng = [pos.coords.latitude, pos.coords.longitude]
         s.setCurrentPosition(np)
+        if (pos.coords.heading !== null && !Number.isNaN(pos.coords.heading)) {
+          s.setUserHeading(pos.coords.heading)
+        }
         s.coveredCoordinatesRef.current = [...s.coveredCoordinatesRef.current, np]
         const ni = nearestCoordinateIndex(s.activeRoutePathRef.current, np)
         s.setWalkedUntilIndex((p) => { const nx = Math.max(p, ni); s.walkedUntilIndexRef.current = nx; return nx })
