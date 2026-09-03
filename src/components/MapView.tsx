@@ -19,27 +19,17 @@ type MapViewProps = {
   walkedUntilIndex: number
   currentPosition: LatLng | null
   checkpoints: RouteCheckpoint[]
+  recordingTrack: LatLng[]
+  isRecording: boolean
 }
 
 const districtStyle: StyleFunction = (feature) => {
   const districtName = normalizeDistrictName(feature?.properties?.District as string | undefined)
   const isActive = isActiveDistrictName(districtName)
-
   if (isActive) {
-    return {
-      color: '#3B82F6',
-      weight: 1.4,
-      fillColor: '#38BDF8',
-      fillOpacity: 0.25,
-    }
+    return { color: '#3B82F6', weight: 1.4, fillColor: '#38BDF8', fillOpacity: 0.25 }
   }
-
-  return {
-    color: '#4B5563',
-    weight: 1,
-    fillColor: '#111827',
-    fillOpacity: 0.55,
-  }
+  return { color: '#4B5563', weight: 1, fillColor: '#111827', fillOpacity: 0.55 }
 }
 
 export default function MapView({
@@ -50,18 +40,16 @@ export default function MapView({
   walkedUntilIndex,
   currentPosition,
   checkpoints,
+  recordingTrack,
+  isRecording,
 }: MapViewProps) {
   const walkedPath = useMemo(() => {
-    if (routePath.length < 2 || walkedUntilIndex <= 0) {
-      return [] as LatLng[]
-    }
+    if (routePath.length < 2 || walkedUntilIndex <= 0) return [] as LatLng[]
     return routePath.slice(0, walkedUntilIndex + 1)
   }, [routePath, walkedUntilIndex])
 
   const remainingPath = useMemo(() => {
-    if (routePath.length < 2) {
-      return [] as LatLng[]
-    }
+    if (routePath.length < 2) return [] as LatLng[]
     return routePath.slice(Math.max(0, walkedUntilIndex))
   }, [routePath, walkedUntilIndex])
 
@@ -72,10 +60,7 @@ export default function MapView({
     () => ({
       type: 'Feature' as const,
       properties: { District: 'Tin Shui Wai' },
-      geometry: {
-        type: 'Polygon' as const,
-        coordinates: [TIN_SHUI_WAI_POLYGON],
-      },
+      geometry: { type: 'Polygon' as const, coordinates: [TIN_SHUI_WAI_POLYGON] },
     }),
     [],
   )
@@ -105,13 +90,7 @@ export default function MapView({
                 (selectedRegionId === 'TUEN_MUN' && districtName === 'Tuen Mun') ||
                 (selectedRegionId === 'YUEN_LONG' && districtName === 'Yuen Long')
               ) {
-                return {
-                  ...style,
-                  fillColor: '#22C55E',
-                  fillOpacity: 0.35,
-                  color: '#16A34A',
-                  weight: 2,
-                }
+                return { ...style, fillColor: '#22C55E', fillOpacity: 0.35, color: '#16A34A', weight: 2 }
               }
               return style
             }}
@@ -119,12 +98,8 @@ export default function MapView({
               const districtName = normalizeDistrictName(feature.properties?.District)
               const tooltipLabel = DISTRICT_NAME_ZH[districtName] ?? districtName
               layer.bindTooltip(tooltipLabel, { sticky: true, opacity: 0.9 })
-
-              if (districtName === 'Tuen Mun') {
-                layer.on('click', () => onSelectRegion('TUEN_MUN'))
-              } else if (districtName === 'Yuen Long') {
-                layer.on('click', () => onSelectRegion('YUEN_LONG'))
-              }
+              if (districtName === 'Tuen Mun') layer.on('click', () => onSelectRegion('TUEN_MUN'))
+              else if (districtName === 'Yuen Long') layer.on('click', () => onSelectRegion('YUEN_LONG'))
             }}
           />
         )}
@@ -151,18 +126,19 @@ export default function MapView({
           <Polyline positions={walkedPath} pathOptions={{ color: '#6B7280', weight: 6 }} />
         )}
 
+        {/* Live recording track (user-created route) */}
+        {isRecording && recordingTrack.length > 1 && (
+          <Polyline positions={recordingTrack} pathOptions={{ color: '#F59E0B', weight: 5, dashArray: '6 4' }} />
+        )}
+
         {startPoint && (
           <CircleMarker center={startPoint} radius={6} pathOptions={{ color: '#10B981', fillOpacity: 0.95 }}>
-            <Tooltip direction="top" offset={[0, -8]} opacity={1}>
-              起點
-            </Tooltip>
+            <Tooltip direction="top" offset={[0, -8]} opacity={1}>起點</Tooltip>
           </CircleMarker>
         )}
         {endPoint && (
           <CircleMarker center={endPoint} radius={6} pathOptions={{ color: '#FB7185', fillOpacity: 0.95 }}>
-            <Tooltip direction="top" offset={[0, -8]} opacity={1}>
-              終點
-            </Tooltip>
+            <Tooltip direction="top" offset={[0, -8]} opacity={1}>終點</Tooltip>
           </CircleMarker>
         )}
 
@@ -184,17 +160,12 @@ export default function MapView({
         ))}
 
         {currentPosition && (
-          <CircleMarker
-            center={currentPosition}
-            radius={8}
-            pathOptions={{ color: '#22C55E', fillOpacity: 0.95 }}
-          >
-            <Tooltip direction="top" offset={[0, -8]} opacity={1}>
-              目前位置
-            </Tooltip>
+          <CircleMarker center={currentPosition} radius={8} pathOptions={{ color: '#22C55E', fillOpacity: 0.95 }}>
+            <Tooltip direction="top" offset={[0, -8]} opacity={1}>目前位置</Tooltip>
           </CircleMarker>
         )}
       </MapContainer>
     </div>
   )
 }
+
