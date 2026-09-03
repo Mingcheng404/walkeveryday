@@ -83,51 +83,83 @@ export function createHandlers(s: S): Handlers {
   }
 
   async function handleGenerateRoute() {
-    if (!s.session) { requestAuth('請先登入，再生成個人路線。'); return }
     if (!isSupabaseConfigured) { s.setStatusMessage('請先設定 Supabase 環境變數。'); return }
     const mins = Number.parseInt(s.estimatedTimeMins, 10)
     if (!Number.isFinite(mins) || mins < 10 || mins > 180) { s.setStatusMessage('請輸入 10 至 180 分鐘之間的步行時間。'); return }
     s.setIsGenerating(true); s.setStatusMessage('正在生成隨機路線與打卡點...')
     try {
       const gen = await generateRandomRoute({ regionId: s.selectedRegionId, estimatedTimeMins: mins, boundaries: s.boundaries })
-      const { data, error } = await supabase.from('routes').insert({
-        user_id: s.session.user.id, district: gen.district, estimated_time_mins: gen.estimatedTimeMins,
-        path_coordinates: gen.pathCoordinates as unknown as Json, checkpoints: gen.checkpoints as unknown as Json,
-        is_public: false, route_source: 'generated', total_distance_km: gen.totalDistanceKm,
-      }).select('*').single()
-      if (error) throw error
-      const next = rowToRouteRecord(data)
-      if (!next) throw new Error('路線資料格式異常。')
-      activateRoute(next, undefined); s.setActiveTab('explore')
-      s.setStatusMessage(`已生成路線，含 ${next.checkpoints.length} 個打卡點。`)
-      await loadUserData(s.session.user.id, s.session.user.email ?? undefined)
+      // Build a temporary route record for display (works without login)
+      const tempRoute: RouteRecord = {
+        id: `temp_${Date.now()}`,
+        district: gen.district,
+        routeName: null,
+        estimatedTimeMins: gen.estimatedTimeMins,
+        pathCoordinates: gen.pathCoordinates,
+        checkpoints: gen.checkpoints,
+        isPublic: false,
+        routeSource: 'generated',
+        totalDistanceKm: gen.totalDistanceKm,
+        createdAt: new Date().toISOString(),
+      }
+      // If logged in, try to save to DB (but don't fail if DB has issues)
+      if (s.session) {
+        try {
+          const { data, error } = await supabase.from('routes').insert({
+            user_id: s.session.user.id, district: gen.district, estimated_time_mins: gen.estimatedTimeMins,
+            path_coordinates: gen.pathCoordinates as unknown as Json, checkpoints: gen.checkpoints as unknown as Json,
+            is_public: false, total_distance_km: gen.totalDistanceKm,
+          }).select('*').single()
+          if (!error && data) {
+            const saved = rowToRouteRecord(data)
+            if (saved) { activateRoute(saved, undefined); s.setActiveTab('explore') }
+            s.setStatusMessage(`已生成並儲存路線，含 ${gen.checkpoints.length} 個打卡點。`)
+            await loadUserData(s.session.user.id, s.session.user.email ?? undefined)
+            return
+          }
+        } catch {
+          // DB save failed (maybe schema not updated) - still show the route
+        }
+      }
+      // Guest mode or DB save failed - just show the route
+      activateRoute(tempRoute, undefined); s.setActiveTab('explore')
+      s.setStatusMessage(s.session ? '路線已生成（資料庫儲存失敗，請先更新 schema.sql）' : `已生成路線（登入後可儲存），含 ${gen.checkpoints.length} 個打卡點。`)
     } catch (e) {
       s.setStatusMessage(e instanceof Error ? e.message : '路線生成失敗。')
     } finally { s.setIsGenerating(false) }
   }
 
   async function handleStartTracking() {
-    if (!s.session) { requestAuth('請先登入，才能啟用 GPS 追蹤。'); return }
-    if (!isSupabaseConfigured) { s.setStatusMessage('請先設定 Supabase 環境變數。'); return }
     if (!s.currentRoute) { s.setStatusMessage('請先生成或選擇一條路線。'); return }
     if (!('geolocation' in navigator)) { s.setLocationError('此瀏覽器不支援定位。'); return }
     if (s.isTracking) return
-    if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission()
-    const existing = s.latestHistoryByRouteId[s.currentRoute.id]
     s.setLocationError('')
-    if (existing && existing.status !== 'completed') {
-      s.activeWalkHistoryIdRef.current = existing.id
-      s.coveredCoordinatesRef.current = existing.coveredCoordinates
-      await supabase.from('walk_history').update({ status: 'in_progress', completed_at: null }).eq('id', existing.id)
-    } else {
-      const { data, error } = await supabase.from('walk_history').insert({
-        user_id: s.session.user.id, route_id: s.currentRoute.id, status: 'in_progress',
-        covered_coordinates: s.coveredCoordinatesRef.current as unknown as Json, calories_burned: 0,
-        started_at: new Date().toISOString(),
-      }).select('id').single()
-      if (error) { s.setStatusMessage(`建立行走紀錄失敗：${error.message}`); return }
-      s.activeWalkHistoryIdRef.current = data.id
+    s.setStatusMessage('正在請求定位權限...')
+
+    // Request notification permission if available
+    if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission()
+
+    // Create walk history record if logged in
+    if (s.session && isSupabaseConfigured) {
+      const existing = s.latestHistoryByRouteId[s.currentRoute.id]
+      if (existing && existing.status !== 'completed') {
+        s.activeWalkHistoryIdRef.current = existing.id
+        s.coveredCoordinatesRef.current = existing.coveredCoordinates
+        await supabase.from('walk_history').update({ status: 'in_progress', completed_at: null }).eq('id', existing.id)
+      } else {
+        try {
+          const { data, error } = await supabase.from('walk_history').insert({
+            user_id: s.session.user.id, route_id: s.currentRoute.id, status: 'in_progress',
+            covered_coordinates: s.coveredCoordinatesRef.current as unknown as Json, calories_burned: 0,
+            started_at: new Date().toISOString(),
+          }).select('id').single()
+          if (!error && data) s.activeWalkHistoryIdRef.current = data.id
+        } catch {
+          // DB insert failed - still allow tracking without saving
+        }
+      }
     }
+
     s.lastSyncAtRef.current = 0
     const wid = navigator.geolocation.watchPosition(
       (pos) => {
@@ -138,15 +170,25 @@ export function createHandlers(s: S): Handlers {
         s.setWalkedUntilIndex((p) => { const nx = Math.max(p, ni); s.walkedUntilIndexRef.current = nx; return nx })
         updateCheckpointUnlock(np)
         const now = Date.now()
-        if (now - s.lastSyncAtRef.current > GEO_SYNC_INTERVAL_MS) { s.lastSyncAtRef.current = now; void syncWalkHistory('in_progress') }
+        if (now - s.lastSyncAtRef.current > GEO_SYNC_INTERVAL_MS) {
+          s.lastSyncAtRef.current = now
+          if (s.activeWalkHistoryIdRef.current) void syncWalkHistory('in_progress')
+        }
         const rl = s.activeRoutePathRef.current.length
         if (rl > 0 && ni >= Math.max(1, rl - 3)) void stopTracking('completed')
       },
-      (e) => s.setLocationError(e.message),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 },
+      (e) => {
+        const msgs: Record<number, string> = {
+          1: '定位權限被拒絕，請在瀏覽器設定中允許定位。',
+          2: '無法取得位置資訊，請確認 GPS 已開啟。',
+          3: '定位逾時，請重試。',
+        }
+        s.setLocationError(msgs[e.code] ?? e.message)
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 },
     )
     s.watchIdRef.current = wid; s.setIsTracking(true)
-    s.setStatusMessage('GPS 追蹤已啟動，靠近打卡點會自動解鎖。')
+    s.setStatusMessage(s.session ? 'GPS 追蹤已啟動，靠近打卡點會自動解鎖。' : 'GPS 追蹤已啟動（登入後可儲存進度）。')
   }
 
   function updateCheckpointUnlock(np: LatLng) {
@@ -227,7 +269,6 @@ export function createHandlers(s: S): Handlers {
   }
 
   async function handleStartRecording() {
-    if (!s.session) { requestAuth('請先登入才能記錄路線。'); return }
     if (!('geolocation' in navigator)) { s.setLocationError('此瀏覽器不支援定位。'); return }
     s.setLocationError('')
     s.setRecordingTrack([]); s.setRecordingDistanceKm(0); s.setRecordingDurationSec(0)
@@ -242,8 +283,15 @@ export function createHandlers(s: S): Handlers {
           return next
         })
       },
-      (e) => s.setLocationError(e.message),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 },
+      (e) => {
+        const msgs: Record<number, string> = {
+          1: '定位權限被拒絕，請在瀏覽器設定中允許定位。',
+          2: '無法取得位置資訊，請確認 GPS 已開啟。',
+          3: '定位逾時，請重試。',
+        }
+        s.setLocationError(msgs[e.code] ?? e.message)
+      },
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 5000 },
     )
     s.recordWatchIdRef.current = wid
     s.recordTimerRef.current = setInterval(() => s.setRecordingDurationSec((p) => p + 1), 1000)
@@ -257,7 +305,8 @@ export function createHandlers(s: S): Handlers {
   }
 
   async function handleSaveRecording(routeName: string, isPublic: boolean) {
-    if (!s.session || !isSupabaseConfigured) return
+    if (!isSupabaseConfigured) { s.setStatusMessage('請先設定 Supabase 環境變數。'); return }
+    if (!s.session) { requestAuth('登入後可儲存自記路線。'); return }
     const track = s.recordingTrack
     if (track.length < 2) { s.setStatusMessage('軌跡太短，無法儲存。'); return }
     const dist = polylineDistanceKm(track)
