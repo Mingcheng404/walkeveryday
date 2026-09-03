@@ -60,7 +60,7 @@ export default function AuthModal({ isOpen, title, onClose, onSuccess }: AuthMod
         })
         if (error) throw error
         setOtpSent(true)
-        setNoticeMessage('已寄送 6 位數驗證碼到你的 Email，請輸入驗證碼、密碼與名稱完成註冊。')
+        setNoticeMessage('已寄送驗證碼到你的 Email，請輸入收到的驗證碼、密碼與名稱完成註冊。')
       } else {
         // Step 2: Verify OTP code
         const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
@@ -121,15 +121,15 @@ export default function AuthModal({ isOpen, title, onClose, onSuccess }: AuthMod
           {mode === 'signup' && otpSent && (
             <>
               <label className="block space-y-2">
-                <span className="text-sm text-slate-200">Email 驗證碼（6 位數字）</span>
+                <span className="text-sm text-slate-200">Email 驗證碼</span>
                 <input
                   type="text"
                   inputMode="numeric"
-                  maxLength={6}
+                  maxLength={8}
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
                   className="w-full rounded-xl border border-slate-600 bg-slate-800 px-4 py-3 text-base tracking-widest text-slate-100 outline-none focus:border-blue-400"
-                  placeholder="123456"
+                  placeholder="12345678"
                 />
               </label>
               <label className="block space-y-2">
