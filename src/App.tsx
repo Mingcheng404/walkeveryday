@@ -62,7 +62,7 @@ function AppView({ s, h }: { s: ReturnType<typeof useAppLogic>; h: Handlers }) {
       <BottomNav
         activeTab={s.activeTab}
         onChange={(tab) => {
-          if ((tab === 'history' || tab === 'stats' || tab === 'profile' || tab === 'record') && !s.session) {
+          if ((tab === 'history' || tab === 'stats' || tab === 'profile') && !s.session) {
             h.requestAuth('登入後可使用完整功能')
           }
           s.setActiveTab(tab)
