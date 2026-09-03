@@ -1,4 +1,4 @@
-type AppTab = 'explore' | 'history' | 'stats' | 'profile'
+type AppTab = 'explore' | 'record' | 'history' | 'stats' | 'profile'
 
 type BottomNavProps = {
   activeTab: AppTab
@@ -7,6 +7,7 @@ type BottomNavProps = {
 
 const tabs: Array<{ id: AppTab; label: string; emoji: string }> = [
   { id: 'explore', label: '探索', emoji: '🧭' },
+  { id: 'record', label: '自記', emoji: '📡' },
   { id: 'history', label: '路線', emoji: '🗂️' },
   { id: 'stats', label: '統計', emoji: '📊' },
   { id: 'profile', label: '我的', emoji: '👤' },
@@ -16,7 +17,7 @@ export default function BottomNav({ activeTab, onChange }: BottomNavProps) {
   return (
     <nav className="pointer-events-auto fixed inset-x-0 bottom-0 z-[990] border-t border-slate-700 bg-slate-900/95 backdrop-blur">
       <div
-        className="mx-auto flex w-full max-w-xl items-center justify-between px-2 pt-2"
+        className="mx-auto flex w-full max-w-xl items-center justify-between px-1 pt-2"
         style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
       >
         {tabs.map((tab) => {
@@ -26,7 +27,7 @@ export default function BottomNav({ activeTab, onChange }: BottomNavProps) {
               key={tab.id}
               type="button"
               onClick={() => onChange(tab.id)}
-              className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-medium ${
+              className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-medium ${
                 active ? 'bg-blue-500/20 text-blue-200' : 'text-slate-300'
               }`}
             >
