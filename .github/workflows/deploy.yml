@@ -76,7 +76,7 @@ jobs:
           echo "Normalized Supabase URL for build: $NORMALIZED_URL"
 
       - name: Build static site
-        run: npm run build
+        run: npx tsc --build --force && vite build
 
       - name: Add SPA fallback for GitHub Pages
         run: cp dist/index.html dist/404.html
