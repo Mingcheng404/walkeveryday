@@ -8,6 +8,7 @@ type HistoryListProps = {
   onOpenRoute: (route: RouteRecord) => void
   onTogglePublic: (routeId: string, nextPublicState: boolean) => void
   onOpenShare: (route: RouteRecord) => void
+  onDeleteRoute: (routeId: string) => void
 }
 
 export default function HistoryList({
@@ -17,10 +18,9 @@ export default function HistoryList({
   onOpenRoute,
   onTogglePublic,
   onOpenShare,
+  onDeleteRoute,
 }: HistoryListProps) {
-  if (loading) {
-    return <p className="py-6 text-center text-sm text-slate-300">正在載入歷史路線...</p>
-  }
+  if (loading) return <p className="py-6 text-center text-sm text-slate-300">正在載入歷史路線...</p>
 
   if (routes.length === 0) {
     return (
@@ -37,24 +37,22 @@ export default function HistoryList({
         const createdAt = new Date(route.createdAt).toLocaleString('zh-HK')
         const latestHistory = latestHistoryByRouteId[route.id]
         const statusLabel =
-          latestHistory?.status === 'completed'
-            ? '已完成'
-            : latestHistory?.status === 'in_progress'
-              ? '行走中'
-              : latestHistory?.status === 'paused'
-                ? '可繼續'
-                : '未開始'
+          latestHistory?.status === 'completed' ? '已完成'
+            : latestHistory?.status === 'in_progress' ? '行走中'
+            : latestHistory?.status === 'paused' ? '可繼續'
+            : '未開始'
+        const sourceLabel = route.routeSource === 'recorded' ? '📡 自記' : '🎲 隨機'
 
         return (
-          <article
-            key={route.id}
-            className="rounded-2xl border border-slate-700/80 bg-slate-800/60 p-3"
-          >
+          <article key={route.id} className="rounded-2xl border border-slate-700/80 bg-slate-800/60 p-3">
             <div className="mb-2 flex items-start justify-between gap-2">
-              <h3 className="m-0 text-base font-semibold text-slate-100">{districtLabel}</h3>
-              <span className="rounded-md bg-slate-700 px-2 py-0.5 text-xs text-slate-200">
-                {statusLabel}
-              </span>
+              <div>
+                <h3 className="m-0 text-base font-semibold text-slate-100">
+                  {route.routeName ?? districtLabel}
+                </h3>
+                <p className="m-0 mt-0.5 text-xs text-slate-400">{sourceLabel} · {districtLabel}</p>
+              </div>
+              <span className="rounded-md bg-slate-700 px-2 py-0.5 text-xs text-slate-200">{statusLabel}</span>
             </div>
             <p className="m-0 text-sm text-slate-300">
               {route.estimatedTimeMins} 分鐘 · 約 {route.totalDistanceKm.toFixed(2)} km
@@ -82,17 +80,27 @@ export default function HistoryList({
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onOpenShare(route)}
-              disabled={!route.isPublic}
-              className="mt-2 w-full rounded-xl border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              生成分享卡片
-            </button>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onOpenShare(route)}
+                disabled={!route.isPublic}
+                className="rounded-xl border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                生成分享卡
+              </button>
+              <button
+                type="button"
+                onClick={() => onDeleteRoute(route.id)}
+                className="rounded-xl border border-rose-400/50 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-200"
+              >
+                刪除路線
+              </button>
+            </div>
           </article>
         )
       })}
     </div>
   )
 }
+
