@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:clean": "npx tsc --build --force && vite build",
     "build:pages": "tsc -b && vite build",
     "lint": "oxlint src vite.config.ts",
     "preview": "vite preview"
