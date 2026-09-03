@@ -117,8 +117,17 @@ export function createHandlers(s: S): Handlers {
             await loadUserData(s.session.user.id, s.session.user.email ?? undefined)
             return
           }
+          if (error) {
+            // DB constraint error - show route anyway with helpful message
+            activateRoute(tempRoute, undefined); s.setActiveTab('explore')
+            s.setStatusMessage(`路線已生成（DB 儲存失敗：${error.message}。請到 Supabase 執行 schema.sql）`)
+            return
+          }
         } catch {
-          // DB save failed (maybe schema not updated) - still show the route
+          // Network error - still show the route
+          activateRoute(tempRoute, undefined); s.setActiveTab('explore')
+          s.setStatusMessage('路線已生成（網路問題，稍後可儲存）')
+          return
         }
       }
       // Guest mode or DB save failed - just show the route
