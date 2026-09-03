@@ -2,6 +2,7 @@ export type LatLng = [number, number]
 export type LngLat = [number, number]
 
 export type WalkStatus = 'in_progress' | 'paused' | 'completed'
+export type RouteSource = 'generated' | 'recorded'
 
 export interface RouteCheckpoint {
   id: string
@@ -13,17 +14,19 @@ export interface RouteCheckpoint {
 export interface RouteRecord {
   id: string
   district: string
+  routeName: string | null
   estimatedTimeMins: number
   pathCoordinates: LatLng[]
   checkpoints: RouteCheckpoint[]
   isPublic: boolean
+  routeSource: RouteSource
   totalDistanceKm: number
   createdAt: string
 }
 
 export interface WalkHistoryRecord {
   id: string
-  routeId: string
+  routeId: string | null
   status: WalkStatus
   coveredCoordinates: LatLng[]
   caloriesBurned: number
@@ -49,4 +52,18 @@ export interface AchievementBadge {
   thresholdDistanceKm: number
   thresholdWalks: number
   thresholdStreak: number
+}
+
+export interface HabitSettings {
+  weeklyTargetDays: number
+  dailyTargetKm: number
+  vacationMode: boolean
+  reminderEnabled: boolean
+  reminderHour: number
+}
+
+export interface WeeklyTrend {
+  label: string
+  distanceKm: number
+  walks: number
 }
