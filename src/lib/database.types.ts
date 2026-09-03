@@ -44,32 +44,38 @@ export interface Database {
           id: string
           user_id: string
           district: string
+          route_name: string | null
           estimated_time_mins: number
           path_coordinates: Json
           checkpoints: Json
           is_public: boolean
+          route_source: string
           total_distance_km: number
           created_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          district: string
-          estimated_time_mins: number
+          district?: string
+          route_name?: string | null
+          estimated_time_mins?: number
           path_coordinates: Json
           checkpoints?: Json
           is_public?: boolean
-          total_distance_km: number
+          route_source?: string
+          total_distance_km?: number
           created_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           district?: string
+          route_name?: string | null
           estimated_time_mins?: number
           path_coordinates?: Json
           checkpoints?: Json
           is_public?: boolean
+          route_source?: string
           total_distance_km?: number
           created_at?: string
         }
@@ -79,7 +85,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string
-          route_id: string
+          route_id: string | null
           status: string
           covered_coordinates: Json
           calories_burned: number
@@ -89,8 +95,8 @@ export interface Database {
         Insert: {
           id?: string
           user_id: string
-          route_id: string
-          status: string
+          route_id?: string | null
+          status?: string
           covered_coordinates?: Json
           calories_burned?: number
           started_at?: string
@@ -99,7 +105,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string
-          route_id?: string
+          route_id?: string | null
           status?: string
           covered_coordinates?: Json
           calories_burned?: number
@@ -162,6 +168,36 @@ export interface Database {
           user_id?: string
           achievement_id?: string
           unlocked_at?: string
+        }
+        Relationships: []
+      }
+      habit_settings: {
+        Row: {
+          user_id: string
+          weekly_target_days: number
+          daily_target_km: number
+          vacation_mode: boolean
+          reminder_enabled: boolean
+          reminder_hour: number
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          weekly_target_days?: number
+          daily_target_km?: number
+          vacation_mode?: boolean
+          reminder_enabled?: boolean
+          reminder_hour?: number
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          weekly_target_days?: number
+          daily_target_km?: number
+          vacation_mode?: boolean
+          reminder_enabled?: boolean
+          reminder_hour?: number
+          updated_at?: string
         }
         Relationships: []
       }
